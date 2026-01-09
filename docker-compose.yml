@@ -1,0 +1,53 @@
+services:
+  web:
+    build: .
+    depends_on:
+      - db
+    ports:
+      - "${ODOO_PORT:-8069}:8069"
+      - "${ODOO_CHAT_PORT:-8072}:8072"
+    volumes:
+      - odoo-web-data:/var/lib/odoo
+      - ./addons:/mnt/extra-addons
+    environment:
+      - HOST=${DB_HOST:-db}
+      - PORT=${DB_PORT:-5432}
+      - USER=${DB_USER:-odoo}
+      - PASSWORD=${DB_PASSWORD}
+    command: >
+      --addons-path=/mnt/extra-addons,/opt/odoo/addons,/opt/odoo/odoo/addons
+      --database=${DB_NAME:-odoo}
+      --db_host=${DB_HOST:-db}
+      --db_port=${DB_PORT:-5432}
+      --db_user=${DB_USER:-odoo}
+      --db_password=${DB_PASSWORD}
+      --db-filter=^${DB_NAME:-odoo}$$
+    restart: unless-stopped
+    networks:
+      - odoo-network
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=${DB_NAME:-odoo}
+      - POSTGRES_USER=${DB_USER:-odoo}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - odoo-db-data:/var/lib/postgresql/data/pgdata
+    restart: unless-stopped
+    networks:
+      - odoo-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-odoo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  odoo-web-data:
+  odoo-db-data:
+
+networks:
+  odoo-network:
+    driver: bridge
